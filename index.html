@@ -14,7 +14,7 @@
   textarea { resize: vertical; }
   button { margin-top: 12px; padding: 10px 18px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; }
   button:hover { background-color: #0056b3; }
-  .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+  .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
   table { width: 100%; border-collapse: collapse; margin-top: 20px; }
   th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle; }
   th { background-color: #f2f2f2; }
@@ -44,6 +44,11 @@
   <form id="itemForm">
     <input type="hidden" id="itemId" />
     <div class="form-row">
+      <div class="form-group">
+        <label for="uniqueId">Unique ID</label>
+        <input type="text" id="uniqueId" readonly />
+      </div>
+
       <div class="form-group">
         <label for="itemName">Item Name *</label>
         <input type="text" id="itemName" required autocomplete="off" />
@@ -104,6 +109,7 @@
   <table id="itemsTable" aria-label="Inventory Items Table">
     <thead>
       <tr>
+        <th>Unique ID</th>
         <th>Item Name</th>
         <th>Type</th>
         <th>Location</th>
@@ -141,26 +147,13 @@
     owners: { store: "owners", default: ["Dennis", "Other"] },
   };
 
-  // Map plural lookup keys to singular element IDs
-  const lookupKeyToElementId = {
-    itemTypes: "itemType",
-    locations: "location",
-    statuses: "status",
-    owners: "owner"
-  };
+  const lookupKeyToElementId = { itemTypes:"itemType", locations:"location", statuses:"status", owners:"owner" };
+  const niceLabelForKey = { itemTypes:"Item Type", locations:"Location", statuses:"Status", owners:"Owner" };
 
-  // Friendly names for prompts
-  const niceLabelForKey = {
-    itemTypes: "Item Type",
-    locations: "Location",
-    statuses: "Status",
-    owners: "Owner"
-  };
-
-  // HTML Elements
   const elements = {
     form: document.getElementById("itemForm"),
     itemId: document.getElementById("itemId"),
+    uniqueId: document.getElementById("uniqueId"),
     itemName: document.getElementById("itemName"),
     itemType: document.getElementById("itemType"),
     location: document.getElementById("location"),
@@ -184,83 +177,73 @@
     },
   };
 
-  // Open or create IndexedDB database
+  // Open IndexedDB
   function openDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        db = request.result;
-        resolve(db);
-      };
+      request.onsuccess = () => { db = request.result; resolve(db); };
       request.onupgradeneeded = e => {
         db = e.target.result;
-
-        // Create object stores
         if (!db.objectStoreNames.contains("items")) {
           const store = db.createObjectStore("items", { keyPath: "id", autoIncrement: true });
           store.createIndex("itemName", "itemName", { unique: false });
+          store.createIndex("uniqueId", "uniqueId", { unique: true });
         }
-
         for (const key in LOOKUPS) {
           if (!db.objectStoreNames.contains(LOOKUPS[key].store)) {
             const store = db.createObjectStore(LOOKUPS[key].store, { keyPath: "id", autoIncrement: true });
-            store.createIndex("name", "name", { unique: true });
+            store.createIndex("name","name",{unique:true});
           }
         }
       };
     });
   }
 
-  // Helper: get all records from store
   function getAll(storeName) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, "readonly");
-      const store = transaction.objectStore(storeName);
-      const request = store.getAll();
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(storeName,"readonly");
+      const store = tx.objectStore(storeName);
+      const req = store.getAll();
+      req.onsuccess = ()=>resolve(req.result);
+      req.onerror = ()=>reject(req.error);
     });
   }
 
-  // Helper: add record to store
   function addRecord(storeName, record) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, "readwrite");
-      const store = transaction.objectStore(storeName);
-      const request = store.add(record);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(storeName,"readwrite");
+      const store = tx.objectStore(storeName);
+      const req = store.add(record);
+      req.onsuccess = ()=>resolve(req.result);
+      req.onerror = ()=>reject(req.error);
     });
   }
 
-  // Helper: update record in store
   function updateRecord(storeName, record) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, "readwrite");
-      const store = transaction.objectStore(storeName);
-      const request = store.put(record);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(storeName,"readwrite");
+      const store = tx.objectStore(storeName);
+      const req = store.put(record);
+      req.onsuccess = ()=>resolve(req.result);
+      req.onerror = ()=>reject(req.error);
     });
   }
 
-  // Helper: delete record by id
-  function deleteRecord(storeName, id) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, "readwrite");
-      const store = transaction.objectStore(storeName);
-      const request = store.delete(id);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
+  function deleteRecord(storeName,id){
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(storeName,"readwrite");
+      const store = tx.objectStore(storeName);
+      const req = store.delete(id);
+      req.onsuccess = ()=>resolve();
+      req.onerror = ()=>reject(req.error);
     });
   }
 
-  // Populate dropdown with lookup values
   async function populateDropdown(storeName, selectElement) {
-    selectElement.innerHTML = "";
+    selectElement.innerHTML="";
     const records = await getAll(storeName);
-    records.forEach(r => {
+    records.forEach(r=>{
       const option = document.createElement("option");
       option.value = r.id;
       option.textContent = r.name;
@@ -268,381 +251,255 @@
     });
   }
 
-  // Add new lookup value if not duplicate, return its id
-  async function addLookupValue(storeName, selectElement, value) {
-    if (!value || !value.trim()) return null;
-    const trimmed = value.trim();
-
-    // Check for existing value (case-insensitive)
+  async function addLookupValue(storeName, selectElement, value){
+    if(!value || !value.trim()) return null;
+    const trimmed=value.trim();
     const all = await getAll(storeName);
-    const existing = all.find(r => r.name.toLowerCase() === trimmed.toLowerCase());
-    if (existing) return existing.id;
-
-    const newId = await addRecord(storeName, { name: trimmed });
+    const existing = all.find(r=>r.name.toLowerCase()===trimmed.toLowerCase());
+    if(existing) return existing.id;
+    const newId = await addRecord(storeName,{name:trimmed});
     await populateDropdown(storeName, selectElement);
-    selectElement.value = newId;
+    selectElement.value=newId;
     return newId;
   }
 
-  // Render items table
-  async function renderItemsTable(filterText = "") {
+  function escapeHtml(text){return text.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+  async function renderItemsTable(filterText=""){
     const allItems = await getAll("items");
     const lookups = {};
-    for (const key in LOOKUPS) {
-      lookups[key] = await getAll(LOOKUPS[key].store);
-    }
+    for(const key in LOOKUPS) lookups[key] = await getAll(LOOKUPS[key].store);
 
     const tbody = elements.itemsTableBody;
-    tbody.innerHTML = "";
+    tbody.innerHTML="";
 
-    const filtered = allItems.filter(item => {
-      if (!filterText) return true;
+    const filtered = allItems.filter(item=>{
+      if(!filterText) return true;
       const search = filterText.toLowerCase();
-      return (
-        (item.itemName && item.itemName.toLowerCase().includes(search)) ||
-        (item.notes && item.notes.toLowerCase().includes(search))
-      );
+      return (item.itemName && item.itemName.toLowerCase().includes(search)) ||
+             (item.notes && item.notes.toLowerCase().includes(search));
     });
 
-    filtered.forEach(item => {
-      const tr = document.createElement("tr");
-
-      function getLookupName(storeKey, id) {
-        const found = lookups[storeKey].find(l => l.id === id);
-        return found ? found.name : "";
-      }
-
-      tr.innerHTML = `
+    filtered.forEach(item=>{
+      function getLookupName(storeKey,id){const f=lookups[storeKey].find(l=>l.id===id);return f?f.name:"";}
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td>${item.uniqueId}</td>
         <td>${item.itemName}</td>
-        <td>${getLookupName("itemTypes", item.itemTypeId)}</td>
-        <td>${getLookupName("locations", item.locationId)}</td>
-        <td>${getLookupName("statuses", item.statusId)}</td>
-        <td>${getLookupName("owners", item.ownerId)}</td>
-        <td>${item.acquiredDate || ""}</td>
-        <td>${item.estimatedValue != null ? Number(item.estimatedValue).toFixed(2) : ""}</td>
-        <td>${item.notes ? escapeHtml(item.notes).replace(/\n/g, "<br>") : ""}</td>
-        <td class="actions">
-          <button data-id="${item.id}" class="editBtn" title="Edit">✏️</button>
-          <button data-id="${item.id}" class="deleteBtn" title="Delete">🗑️</button>
-        </td>
-      `;
+        <td>${getLookupName("itemTypes",item.itemTypeId)}</td>
+        <td>${getLookupName("locations",item.locationId)}</td>
+        <td>${getLookupName("statuses",item.statusId)}</td>
+        <td>${getLookupName("owners",item.ownerId)}</td>
+        <td>${item.acquiredDate||""}</td>
+        <td>${item.estimatedValue!=null?Number(item.estimatedValue).toFixed(2):""}</td>
+        <td>${item.notes?escapeHtml(item.notes).replace(/\n/g,"<br>"):""}</td>
+        <td class="actions"><button data-id="${item.id}" class="editBtn">✏️</button>
+        <button data-id="${item.id}" class="deleteBtn">🗑️</button></td>`;
       tbody.appendChild(tr);
     });
 
-    // Attach button listeners
-    document.querySelectorAll(".editBtn").forEach(btn =>
-      btn.addEventListener("click", () => editItem(parseInt(btn.dataset.id)))
-    );
-    document.querySelectorAll(".deleteBtn").forEach(btn =>
-      btn.addEventListener("click", () => deleteItem(parseInt(btn.dataset.id)))
-    );
+    document.querySelectorAll(".editBtn").forEach(btn=>btn.addEventListener("click",()=>editItem(parseInt(btn.dataset.id))));
+    document.querySelectorAll(".deleteBtn").forEach(btn=>btn.addEventListener("click",()=>deleteItem(parseInt(btn.dataset.id))));
   }
 
-  // Escape HTML special chars
-  function escapeHtml(text) {
-    return text.replace(/[&<>"']/g, m => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    })[m]);
-  }
-
-  // Load item data into form for editing
-  async function editItem(id) {
-    const transaction = db.transaction("items", "readonly");
-    const store = transaction.objectStore("items");
-    const req = store.get(id);
-    req.onsuccess = async () => {
-      const item = req.result;
-      if (!item) return alert("Item not found");
-      elements.itemId.value = item.id;
-      elements.itemName.value = item.itemName || "";
-      elements.itemType.value = item.itemTypeId || "";
-      elements.location.value = item.locationId || "";
-      elements.status.value = item.statusId || "";
-      elements.owner.value = item.ownerId || "";
-      elements.acquiredDate.value = item.acquiredDate || "";
-      elements.estimatedValue.value = item.estimatedValue != null ? item.estimatedValue : "";
-      elements.notes.value = item.notes || "";
-      elements.saveBtn.textContent = "Update Item";
-      elements.saveBtn.disabled = false;
-      elements.itemName.focus();
+  async function editItem(id){
+    const tx=db.transaction("items","readonly");
+    const store=tx.objectStore("items");
+    const req=store.get(id);
+    req.onsuccess=()=>{
+      const item=req.result;
+      if(!item)return alert("Item not found");
+      elements.itemId.value=item.id;
+      elements.uniqueId.value=item.uniqueId;
+      elements.itemName.value=item.itemName||"";
+      elements.itemType.value=item.itemTypeId||"";
+      elements.location.value=item.locationId||"";
+      elements.status.value=item.statusId||"";
+      elements.owner.value=item.ownerId||"";
+      elements.acquiredDate.value=item.acquiredDate||"";
+      elements.estimatedValue.value=item.estimatedValue!=null?item.estimatedValue:"";
+      elements.notes.value=item.notes||"";
+      elements.saveBtn.textContent="Update Item";
     };
   }
 
-  // Clear form
-  function resetForm() {
+  function resetForm(){
     elements.form.reset();
-    elements.itemId.value = "";
-    elements.saveBtn.textContent = "Add Item";
+    elements.itemId.value="";
+    elements.uniqueId.value="";
+    elements.saveBtn.textContent="Add Item";
   }
 
-  // Save new or updated item
-  async function saveItem(event) {
+  async function saveItem(event){
     event.preventDefault();
-    elements.saveBtn.disabled = true;
+    elements.saveBtn.disabled=true;
 
-    const itemName = elements.itemName.value.trim();
-    if (!itemName) {
-      alert("Item Name is required");
-      elements.saveBtn.disabled = false;
-      return;
-    }
+    const itemName=elements.itemName.value.trim();
+    if(!itemName){alert("Item Name is required"); elements.saveBtn.disabled=false; return;}
 
-    const itemTypeId = parseInt(elements.itemType.value);
-    const locationId = parseInt(elements.location.value);
-    const statusId = parseInt(elements.status.value);
-    const ownerId = parseInt(elements.owner.value);
+    const itemTypeId=parseInt(elements.itemType.value);
+    const locationId=parseInt(elements.location.value);
+    const statusId=parseInt(elements.status.value);
+    const ownerId=parseInt(elements.owner.value);
 
-    if ([itemTypeId, locationId, statusId, ownerId].some(isNaN)) {
-      alert("Please select valid values for all dropdowns");
-      elements.saveBtn.disabled = false;
-      return;
-    }
+    if([itemTypeId,locationId,statusId,ownerId].some(isNaN)){alert("Please select valid values for all dropdowns"); elements.saveBtn.disabled=false; return;}
+
+    let uniqueId = elements.uniqueId.value;
+    if(!uniqueId) uniqueId = Date.now(); // auto-generated numerical unique ID
 
     const newItem = {
+      uniqueId,
       itemName,
       itemTypeId,
       locationId,
       statusId,
       ownerId,
       acquiredDate: elements.acquiredDate.value || null,
-      estimatedValue: elements.estimatedValue.value !== "" ? parseFloat(elements.estimatedValue.value) : null,
-      notes: elements.notes.value.trim() || "",
+      estimatedValue: elements.estimatedValue.value!==""?parseFloat(elements.estimatedValue.value):null,
+      notes: elements.notes.value.trim() || ""
     };
 
-    try {
-      if (elements.itemId.value) {
-        newItem.id = parseInt(elements.itemId.value);
-        await updateRecord("items", newItem);
-      } else {
-        await addRecord("items", newItem);
+    try{
+      if(elements.itemId.value){
+        newItem.id=parseInt(elements.itemId.value);
+        await updateRecord("items",newItem);
+      }else{
+        await addRecord("items",newItem);
       }
       await renderItemsTable(elements.searchInput.value.trim());
       resetForm();
-    } catch (err) {
-      alert("Error saving item: " + err.message);
-    } finally {
-      elements.saveBtn.disabled = false;
+    }catch(err){alert("Error saving item: "+err.message);}
+    finally{elements.saveBtn.disabled=false;}
+  }
+
+  async function deleteItem(id){
+    if(!confirm("Are you sure you want to delete this item?")) return;
+    try{await deleteRecord("items",id); await renderItemsTable(elements.searchInput.value.trim()); if(elements.itemId.value==id) resetForm();}
+    catch(err){alert("Error deleting item: "+err.message);}
+  }
+
+  async function addLookupPrompt(storeKey, selectElement, label){
+    const value=prompt(`Add new ${label}:`);
+    if(!value) return;
+    try{await addLookupValue(LOOKUPS[storeKey].store,selectElement,value);}
+    catch(err){alert("Error adding new "+label+": "+err.message);}
+  }
+
+  async function addDefaultsIfNeeded(){
+    for(const key in LOOKUPS){
+      const storeName=LOOKUPS[key].store;
+      const all=await getAll(storeName);
+      if(all.length===0) for(const name of LOOKUPS[key].default) await addRecord(storeName,{name});
     }
   }
 
-  // Delete item with confirmation
-  async function deleteItem(id) {
-    if (!confirm("Are you sure you want to delete this item?")) return;
-    try {
-      await deleteRecord("items", id);
-      await renderItemsTable(elements.searchInput.value.trim());
-      if (elements.itemId.value == id) resetForm();
-    } catch (err) {
-      alert("Error deleting item: " + err.message);
+  async function init(){
+    await openDB();
+    await addDefaultsIfNeeded();
+    for(const key in LOOKUPS) await populateDropdown(LOOKUPS[key].store,elements[lookupKeyToElementId[key]]);
+    await renderItemsTable();
+    elements.form.addEventListener("submit",saveItem);
+    elements.resetBtn.addEventListener("click",e=>{e.preventDefault(); resetForm();});
+    elements.searchInput.addEventListener("input",()=>renderItemsTable(elements.searchInput.value.trim()));
+
+    for(const key in LOOKUPS){
+      const elementId=lookupKeyToElementId[key];
+      elements.addButtons[elementId].addEventListener("click",()=>addLookupPrompt(key,elements[elementId],niceLabelForKey[key]));
     }
-  }
 
-  // Add new lookup item prompt and update dropdown
-  async function addLookupPrompt(storeKey, selectElement, label) {
-    const value = prompt(`Add new ${label}:`);
-    if (!value) return;
-    try {
-      await addLookupValue(LOOKUPS[storeKey].store, selectElement, value);
-    } catch (err) {
-      alert("Error adding new " + label + ": " + err.message);
-    }
-  }
+    // Export/Import
+    elements.exportBtn.addEventListener("click",async ()=>{
+      try{
+        const exportObj={};
+        exportObj.items=await getAll("items");
+                for(const key in LOOKUPS){
+          exportObj[key] = await getAll(LOOKUPS[key].store);
+        }
+        const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "home_inventory_export_" + new Date().toISOString().slice(0,10) + ".json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }catch(err){alert("Error exporting data: "+err.message);}
+    });
 
-  // Export the entire DB to JSON file
-  async function exportData() {
-    try {
-      const exportObj = {};
-      exportObj.items = await getAll("items");
-      for (const key in LOOKUPS) {
-        exportObj[key] = await getAll(LOOKUPS[key].store);
-      }
-            const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "home_inventory_export_" + new Date().toISOString().slice(0,10) + ".json";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      alert("Error exporting data: " + err.message);
-    }
-  }
+    elements.importBtn.addEventListener("click",()=>elements.fileInput.click());
+    elements.fileInput.addEventListener("change", async e=>{
+      if(!e.target.files.length) return;
+      const file = e.target.files[0];
+      try{
+        const text = await file.text();
+        const importObj = JSON.parse(text);
+        if(!importObj.items){alert("Invalid import file."); return;}
 
-  // Import JSON file, parse and merge with existing DB
-  async function importData(file) {
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const importObj = JSON.parse(text);
-
-      if (!importObj.items) {
-        alert("Invalid import file: no 'items' array found.");
-        return;
-      }
-
-      // Merge lookup tables first
-      for (const key in LOOKUPS) {
-        if (!importObj[key]) continue;
-        const storeName = LOOKUPS[key].store;
-        const existingLookups = await getAll(storeName);
-
-        for (const importItem of importObj[key]) {
-          // Check if name exists (case-insensitive)
-          const existing = existingLookups.find(l => l.name.toLowerCase() === importItem.name.toLowerCase());
-          if (!existing) {
-            // Add new lookup item
-            await addRecord(storeName, { name: importItem.name });
+        // Merge lookups first
+        for(const key in LOOKUPS){
+          if(!importObj[key]) continue;
+          const storeName = LOOKUPS[key].store;
+          const existingLookups = await getAll(storeName);
+          for(const imp of importObj[key]){
+            const found = existingLookups.find(l=>l.name.toLowerCase()===imp.name.toLowerCase());
+            if(!found) await addRecord(storeName,{name:imp.name});
           }
         }
-      }
 
-      // After ensuring all lookup values are in place, get updated lookup lists to map names to ids
-      const lookupMaps = {};
-      for (const key in LOOKUPS) {
-        const all = await getAll(LOOKUPS[key].store);
-        lookupMaps[key] = new Map(all.map(l => [l.name.toLowerCase(), l.id]));
-      }
-
-      // Now merge items:
-      // Strategy:
-      // - For each imported item:
-      //    - Try to find existing item by id in DB
-      //    - If found, update item
-      //    - Else add new item
-      // - Also delete any local items that are NOT present in import file (sync)
-
-      const localItems = await getAll("items");
-      const localIds = new Set(localItems.map(i => i.id));
-      const importIds = new Set(importObj.items.map(i => i.id));
-
-      // Prepare a map of import items by id
-      const importItemsById = new Map(importObj.items.map(i => [i.id, i]));
-
-      // Delete items locally missing in import
-      for (const localItem of localItems) {
-        if (!importIds.has(localItem.id)) {
-          await deleteRecord("items", localItem.id);
-        }
-      }
-
-      // Add or update imported items
-      for (const impItem of importObj.items) {
-        // Map old lookup ids to current lookup ids by matching names
-        function mapLookup(key, oldId) {
-          if (!oldId) return null;
-          // We need the old name from import
-          const oldLookupArray = importObj[key];
-          if (!oldLookupArray) return null;
-          const oldLookupItem = oldLookupArray.find(l => l.id === oldId);
-          if (!oldLookupItem) return null;
-          const newId = lookupMaps[key].get(oldLookupItem.name.toLowerCase());
-          return newId || null;
+        // Refresh lookups mapping
+        const lookupMaps = {};
+        for(const key in LOOKUPS){
+          const all = await getAll(LOOKUPS[key].store);
+          lookupMaps[key] = new Map(all.map(l=>[l.name.toLowerCase(),l.id]));
         }
 
-        const mappedItem = {
-          id: impItem.id, // keep same id for syncing
-          itemName: impItem.itemName,
-          itemTypeId: mapLookup("itemTypes", impItem.itemTypeId),
-          locationId: mapLookup("locations", impItem.locationId),
-          statusId: mapLookup("statuses", impItem.statusId),
-          ownerId: mapLookup("owners", impItem.ownerId),
-          acquiredDate: impItem.acquiredDate || null,
-          estimatedValue: impItem.estimatedValue != null ? impItem.estimatedValue : null,
-          notes: impItem.notes || "",
-        };
+        // Sync items
+        const localItems = await getAll("items");
+        const localIds = new Set(localItems.map(i=>i.id));
+        const importIds = new Set(importObj.items.map(i=>i.id));
 
-        if (localIds.has(impItem.id)) {
-          await updateRecord("items", mappedItem);
-        } else {
-          // IndexedDB autoIncrement won't be used here because we keep id, so use put()
-          await new Promise((resolve, reject) => {
-            const transaction = db.transaction("items", "readwrite");
-            const store = transaction.objectStore("items");
+        // Delete items not in import
+        for(const li of localItems) if(!importIds.has(li.id)) await deleteRecord("items", li.id);
+
+        for(const impItem of importObj.items){
+          function mapLookup(key, oldId){
+            if(!oldId) return null;
+            const oldLookupArray = importObj[key];
+            if(!oldLookupArray) return null;
+            const oldLookupItem = oldLookupArray.find(l=>l.id===oldId);
+            if(!oldLookupItem) return null;
+            return lookupMaps[key].get(oldLookupItem.name.toLowerCase())||null;
+          }
+
+          const mappedItem = {
+            id: impItem.id,
+            uniqueId: impItem.uniqueId || Date.now(),
+            itemName: impItem.itemName,
+            itemTypeId: mapLookup("itemTypes", impItem.itemTypeId),
+            locationId: mapLookup("locations", impItem.locationId),
+            statusId: mapLookup("statuses", impItem.statusId),
+            ownerId: mapLookup("owners", impItem.ownerId),
+            acquiredDate: impItem.acquiredDate || null,
+            estimatedValue: impItem.estimatedValue != null ? impItem.estimatedValue : null,
+            notes: impItem.notes || "",
+          };
+
+          if(localIds.has(impItem.id)) await updateRecord("items", mappedItem);
+          else await new Promise((resolve,reject)=>{
+            const tx = db.transaction("items","readwrite");
+            const store = tx.objectStore("items");
             const req = store.put(mappedItem);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
+            req.onsuccess = ()=>resolve();
+            req.onerror = ()=>reject(req.error);
           });
         }
-      }
 
-      alert("Import successful! Inventory synced.");
-      await refreshAll();
-    } catch (err) {
-      alert("Error importing data: " + err.message);
-    }
-  }
-
-  // Refresh UI lists and table
-  async function refreshAll() {
-    for (const key in LOOKUPS) {
-      await populateDropdown(LOOKUPS[key].store, elements[lookupKeyToElementId[key]]);
-    }
-    await renderItemsTable(elements.searchInput.value.trim());
-  }
-
-  // Add defaults if lookup stores are empty (fix for initial dropdowns)
-  async function addDefaultsIfNeeded() {
-    for (const key in LOOKUPS) {
-      const storeName = LOOKUPS[key].store;
-      const all = await getAll(storeName);
-      if (all.length === 0) {
-        // Add default entries
-        for (const name of LOOKUPS[key].default) {
-          await addRecord(storeName, { name });
-        }
-      }
-    }
-  }
-
-  // Initialization
-  async function init() {
-    await openDB();
-
-    await addDefaultsIfNeeded();
-
-    // Populate dropdowns
-    for (const key in LOOKUPS) {
-      await populateDropdown(LOOKUPS[key].store, elements[lookupKeyToElementId[key]]);
-    }
-
-    await renderItemsTable();
-
-    // Event listeners
-    elements.form.addEventListener("submit", saveItem);
-    elements.resetBtn.addEventListener("click", e => {
-      e.preventDefault();
-      resetForm();
+        alert("Import completed successfully!");
+        await renderItemsTable();
+      }catch(err){alert("Error importing data: "+err.message);}
+      elements.fileInput.value="";
     });
-
-    elements.searchInput.addEventListener("input", () => {
-      renderItemsTable(elements.searchInput.value.trim());
-    });
-
-    elements.exportBtn.addEventListener("click", exportData);
-    elements.importBtn.addEventListener("click", () => elements.fileInput.click());
-    elements.fileInput.addEventListener("change", e => {
-      if (e.target.files.length) {
-        importData(e.target.files[0]);
-      }
-      elements.fileInput.value = ""; // reset
-    });
-
-    // Add new lookup buttons
-    for (const key in LOOKUPS) {
-      const elementId = lookupKeyToElementId[key];
-      elements.addButtons[elementId].addEventListener("click", () =>
-        addLookupPrompt(key, elements[elementId], niceLabelForKey[key])
-      );
-    }
   }
-
-  // The previously defined functions (saveItem, resetForm, renderItemsTable, editItem, deleteItem, addLookupPrompt) remain unchanged.
 
   init();
 })();
