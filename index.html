@@ -190,13 +190,6 @@
           if (!db.objectStoreNames.contains(LOOKUPS[key].store)) {
             const store = db.createObjectStore(LOOKUPS[key].store, { keyPath: "id", autoIncrement: true });
             store.createIndex("name", "name", { unique: true });
-
-            // Insert default values during upgrade
-            store.transaction.oncomplete = () => {
-              const transaction = db.transaction(LOOKUPS[key].store, "readwrite");
-              const lookupStore = transaction.objectStore(LOOKUPS[key].store);
-              LOOKUPS[key].default.forEach(name => lookupStore.add({ name }));
-            };
           }
         }
       };
@@ -451,7 +444,7 @@
       for (const key in LOOKUPS) {
         exportObj[key] = await getAll(LOOKUPS[key].store);
       }
-           const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -459,7 +452,7 @@
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+            URL.revokeObjectURL(url);
     } catch (err) {
       alert("Error exporting data: " + err.message);
     }
@@ -577,9 +570,25 @@
     await renderItemsTable(elements.searchInput.value.trim());
   }
 
+  // Add defaults if lookup stores are empty (fix for initial dropdowns)
+  async function addDefaultsIfNeeded() {
+    for (const key in LOOKUPS) {
+      const storeName = LOOKUPS[key].store;
+      const all = await getAll(storeName);
+      if (all.length === 0) {
+        // Add default entries
+        for (const name of LOOKUPS[key].default) {
+          await addRecord(storeName, { name });
+        }
+      }
+    }
+  }
+
   // Initialization
   async function init() {
     await openDB();
+
+    await addDefaultsIfNeeded();
 
     // Populate dropdowns
     for (const key in LOOKUPS) {
@@ -614,6 +623,9 @@
     elements.addButtons.status.addEventListener("click", () => addLookupPrompt("statuses", elements.status, "Status"));
     elements.addButtons.owner.addEventListener("click", () => addLookupPrompt("owners", elements.owner, "Owner"));
   }
+
+  // The rest of the previously defined functions (saveItem, resetForm, etc.) go here
+  // They were fully provided in the previous messages.
 
   init();
 })();
