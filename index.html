@@ -141,6 +141,22 @@
     owners: { store: "owners", default: ["Dennis", "Other"] },
   };
 
+  // Map plural lookup keys to singular element IDs
+  const lookupKeyToElementId = {
+    itemTypes: "itemType",
+    locations: "location",
+    statuses: "status",
+    owners: "owner"
+  };
+
+  // Friendly names for prompts
+  const niceLabelForKey = {
+    itemTypes: "Item Type",
+    locations: "Location",
+    statuses: "Status",
+    owners: "Owner"
+  };
+
   // HTML Elements
   const elements = {
     form: document.getElementById("itemForm"),
@@ -426,11 +442,11 @@
   }
 
   // Add new lookup item prompt and update dropdown
-  async function addLookupPrompt(storeName, selectElement, label) {
+  async function addLookupPrompt(storeKey, selectElement, label) {
     const value = prompt(`Add new ${label}:`);
     if (!value) return;
     try {
-      await addLookupValue(storeName, selectElement, value);
+      await addLookupValue(LOOKUPS[storeKey].store, selectElement, value);
     } catch (err) {
       alert("Error adding new " + label + ": " + err.message);
     }
@@ -444,15 +460,15 @@
       for (const key in LOOKUPS) {
         exportObj[key] = await getAll(LOOKUPS[key].store);
       }
-      const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+            const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `home_inventory_export_${new Date().toISOString().slice(0,10)}.json`;
+      a.download = "home_inventory_export_" + new Date().toISOString().slice(0,10) + ".json";
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+      a.remove();
+      URL.revokeObjectURL(url);
     } catch (err) {
       alert("Error exporting data: " + err.message);
     }
@@ -565,7 +581,7 @@
   // Refresh UI lists and table
   async function refreshAll() {
     for (const key in LOOKUPS) {
-      await populateDropdown(LOOKUPS[key].store, elements[key.replace("s", "")]);
+      await populateDropdown(LOOKUPS[key].store, elements[lookupKeyToElementId[key]]);
     }
     await renderItemsTable(elements.searchInput.value.trim());
   }
@@ -592,7 +608,7 @@
 
     // Populate dropdowns
     for (const key in LOOKUPS) {
-      await populateDropdown(LOOKUPS[key].store, elements[key.replace("s", "")]);
+      await populateDropdown(LOOKUPS[key].store, elements[lookupKeyToElementId[key]]);
     }
 
     await renderItemsTable();
@@ -618,14 +634,15 @@
     });
 
     // Add new lookup buttons
-    elements.addButtons.itemType.addEventListener("click", () => addLookupPrompt("itemTypes", elements.itemType, "Item Type"));
-    elements.addButtons.location.addEventListener("click", () => addLookupPrompt("locations", elements.location, "Location"));
-    elements.addButtons.status.addEventListener("click", () => addLookupPrompt("statuses", elements.status, "Status"));
-    elements.addButtons.owner.addEventListener("click", () => addLookupPrompt("owners", elements.owner, "Owner"));
+    for (const key in LOOKUPS) {
+      const elementId = lookupKeyToElementId[key];
+      elements.addButtons[elementId].addEventListener("click", () =>
+        addLookupPrompt(key, elements[elementId], niceLabelForKey[key])
+      );
+    }
   }
 
-  // The rest of the previously defined functions (saveItem, resetForm, etc.) go here
-  // They were fully provided in the previous messages.
+  // The previously defined functions (saveItem, resetForm, renderItemsTable, editItem, deleteItem, addLookupPrompt) remain unchanged.
 
   init();
 })();
